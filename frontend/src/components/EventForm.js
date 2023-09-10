@@ -8,6 +8,7 @@ import {
 } from 'react-router-dom';
 
 import classes from './EventForm.module.css';
+import { getAuthToken } from '../util/auth';
 
 function EventForm({ method, event }) {
     const data = useActionData();
@@ -16,9 +17,9 @@ function EventForm({ method, event }) {
 
     const isSubmitting = navigation.state === 'submitting';
 
-    const cancelHandler = () => {
+    function cancelHandler() {
         navigate('..');
-    };
+    }
 
     return (
         <Form method={method} className={classes.form}>
@@ -78,7 +79,7 @@ function EventForm({ method, event }) {
                     Cancel
                 </button>
                 <button disabled={isSubmitting}>
-                    {isSubmitting ? 'Submitting' : 'Save'}
+                    {isSubmitting ? 'Submitting...' : 'Save'}
                 </button>
             </div>
         </Form>
@@ -88,39 +89,47 @@ function EventForm({ method, event }) {
 export default EventForm;
 
 export const action = async ({ request, params }) => {
-    const method = request.method;
+        const method = request.method;
+        const data = await request.formData();
 
-    const data = await request.formData();
+        const identifier = localStorage.getItem('identifier');
+        console.log("u akciji: ", identifier);
 
-    const eventData = {
-        title: data.get('title'),
-        image: data.get('image'),
-        date: data.get('date'),
-        description: data.get('description'),
+        const eventData = {
+            title: data.get('title'),
+            image: data.get('image'),
+            date: data.get('date'),
+            description: data.get('description'),
+            creator: identifier,
+        };
+
+        let url = 'http://localhost:8080/events';
+
+        if (method === 'PATCH') {
+            const eventId = params.eventId;
+            url = 'http://localhost:8080/events/' + eventId;
+        }
+
+        const token = getAuthToken();
+
+        console.log(JSON.stringify(eventData));
+
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: 'Bearer ' + token,
+            },
+            body: JSON.stringify(eventData),
+        });
+
+        if (response.status === 422) {
+            return response;
+        }
+
+        if (!response.ok) {
+            throw json({ message: 'Could not save event.' }, { status: 500 });
+        }
+
+        return redirect('/events');
     };
-
-    let url = 'http://localhost:8080/events/';
-
-    if (method === 'PATCH') {
-        const eventId = params.eventId;
-        url += eventId;
-    }
-
-    const response = await fetch(url, {
-        method: method,
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(eventData),
-    });
-
-    if (response.status === 422) {
-        return response;
-    }
-
-    if (!response.ok) {
-        throw json({ message: 'Could not save event' }, { status: 500 });
-    }
-
-    return redirect('/events');
-};

@@ -3,5 +3,7 @@ CREATE TABLE events (
     title TEXT,
     eventDate TEXT,
     imageURL TEXT,
-    eventDescription TEXT
+    eventDescription TEXT,
+    creator TEXT,
+    FOREIGN KEY (creator) REFERENCES users(id)
 );

@@ -5,6 +5,9 @@ const {
     isValidDate,
     isValidImageUrl,
 } = require('../util/validation');
+const { checkAuth } = require('../util/auth');
+const { getUserId } = require('../util/db');
+
 const { v4: uuidv4 } = require('uuid');
 const sqlite3 = require('sqlite3');
 
@@ -24,7 +27,7 @@ function handleError(res, error) {
 }
 
 router.get('/', (req, res) => {
-    const query = 'SELECT * FROM events';
+    const query = 'SELECT e.*, u.username FROM events e JOIN users u ON e.creator = u.id';
     db.all(query, [], (err, rows) => {
         if (err) {
             handleError(res, err);
@@ -35,7 +38,7 @@ router.get('/', (req, res) => {
 });
 
 router.get('/:id', (req, res) => {
-    const query = 'SELECT * FROM events WHERE id = ?';
+    const query = 'SELECT e.*, u.username FROM events e JOIN users u ON e.creator = u.id WHERE e.id = ?';
     db.get(query, [req.params.id], (err, row) => {
         if (err) {
             handleError(res, err);
@@ -49,7 +52,9 @@ router.get('/:id', (req, res) => {
     });
 });
 
-router.post('/', (req, res) => {
+router.use(checkAuth);
+
+router.post('/', async(req, res) => {
     const data = req.body;
 
     let errors = {};
@@ -63,7 +68,6 @@ router.post('/', (req, res) => {
     }
 
     if (!isValidDate(data.date)) {
-        console.log(data.date);
         errors.date = 'Invalid date.';
     }
 
@@ -78,14 +82,21 @@ router.post('/', (req, res) => {
         });
     }
 
+    console.log("req.body: ", req.body);
+
+    const creator = await getUserId(req.body.creator);
+    console.log("na be: ", creator);
+    
+
     const query =
-        'INSERT INTO events (id, title, eventDate, imageURL, eventDescription) VALUES (?, ?, ?, ?, ?)';
+        'INSERT INTO events (id, title, eventDate, imageURL, eventDescription, creator) VALUES (?, ?, ?, ?, ?, ?)';
     const params = [
         uuidv4(),
         data.title,
         data.date,
         data.image,
         data.description,
+        creator,
     ];
 
     db.run(query, params, (err) => {
